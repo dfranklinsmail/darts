@@ -22,13 +22,22 @@ class AvgrageMeter(object):
     self.avg = self.sum / self.cnt
 
 
-def accuracy(output, target, topk=(1,)):
+def accuracy(output, target, confusion, topk=(1,)):
   maxk = max(topk)
   batch_size = target.size(0)
 
   _, pred = output.topk(maxk, 1, True, True)
   pred = pred.t()
   correct = pred.eq(target.view(1, -1).expand_as(pred))
+  
+  if confusion != None:
+    #print('in accuracy')
+    predicted = pred[0].data.cpu().numpy()
+    #print('the pred is ', predicted)
+    real = target.view(1, -1).data.cpu().numpy()[0]
+    #print('the target is ', real)
+    for i in range(batch_size):
+        confusion[real[i]][predicted[i]] = 1 + confusion[real[i]][predicted[i]]
 
   res = []
   for k in topk:
@@ -64,17 +73,23 @@ def _data_transforms_cifar10(args):
   CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
 
   train_transform = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
+    transforms.Resize((64, 64)),
+    #transforms.RandomCrop(32, padding=4),
+    #transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
-    transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+    #transforms.ToPILImage(),
+    #transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225] ),
   ])
   if args.cutout:
     train_transform.transforms.append(Cutout(args.cutout_length))
 
   valid_transform = transforms.Compose([
+    transforms.Resize((64, 64)),
     transforms.ToTensor(),
-    transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225] ),
+    #transforms.ToPILImage(),
+    #transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
     ])
   return train_transform, valid_transform
 

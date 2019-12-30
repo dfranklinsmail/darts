@@ -27,7 +27,8 @@ parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 parser.add_argument('--weight_decay', type=float, default=3e-4, help='weight decay')
 parser.add_argument('--report_freq', type=float, default=50, help='report frequency')
 parser.add_argument('--gpu', type=int, default=0, help='gpu device id')
-parser.add_argument('--epochs', type=int, default=50, help='num of training epochs')
+parser.add_argument('--epochs', type=int, default=10, help='num of training epochs')
+#parser.add_argument('--epochs', type=int, default=50, help='num of training epochs')
 parser.add_argument('--init_channels', type=int, default=16, help='num of init channels')
 parser.add_argument('--layers', type=int, default=8, help='total number of layers')
 parser.add_argument('--model_path', type=str, default='saved_models', help='path to save the model')
@@ -74,6 +75,10 @@ def main():
 
   criterion = nn.CrossEntropyLoss()
   criterion = criterion.cuda()
+  #Use model search to create the model
+  #args.init_channels - 6
+  #CIFAR_CLASSES = 10
+  #args.layers = 8
   model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
   model = model.cuda()
   logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
@@ -172,21 +177,23 @@ def infer(valid_queue, model, criterion):
   top5 = utils.AvgrageMeter()
   model.eval()
 
-  for step, (input, target) in enumerate(valid_queue):
-    input = Variable(input, volatile=True).cuda()
-    target = Variable(target, volatile=True).cuda(async=True)
+  with torch.no_grad():
+    for step, (input, target) in enumerate(valid_queue):
 
-    logits = model(input)
-    loss = criterion(logits, target)
+      input = Variable(input, volatile=True).cuda()
+      target = Variable(target, volatile=True).cuda(async=True)
 
-    prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-    n = input.size(0)
-    objs.update(loss.data, n)
-    top1.update(prec1.data, n)
-    top5.update(prec5.data, n)
+      logits = model(input)
+      loss = criterion(logits, target)
 
-    if step % args.report_freq == 0:
-      logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+      prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+      n = input.size(0)
+      objs.update(loss.data, n)
+      top1.update(prec1.data, n)
+      top5.update(prec5.data, n)
+
+      if step % args.report_freq == 0:
+        logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
   return top1.avg, objs.avg
 
